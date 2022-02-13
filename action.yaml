@@ -1,0 +1,38 @@
+name: Re-enable automerge
+description: Re-enable automerge when automerge is disabled due to `Base branch was modified`
+inputs:
+  github_token:
+    required: true
+    description: GitHub Access Token. `secrets.GITHUB_TOKEN` can't be used
+runs:
+  using: composite
+  steps:
+    - run: |
+        echo "::error ::input github_token is required. https://github.com/suzuki-shunsuke/reenable-automerge-action"
+        exit 1
+      shell: bash
+      if: inputs.github_token == ''
+
+    # https://cli.github.com/manual/gh_api
+    # https://docs.github.com/en/rest/reference/pulls#update-a-pull-request-branch
+    - run: gh api -X PUT "repos/${GITHUB_REPOSITORY}/pulls/${{ github.event.pull_request.number }}/update-branch"
+      shell: bash
+      env:
+        # secrets.GITHUB_TOKEN can't be used because it can't trigger GitHub Actions Workflow
+        # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+        # > When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+
+    # This prevents pull request from being merged before running a new workflow.
+    - name: wait for starting a new workflow by updating branch
+      shell: bash
+      run: sleep 5
+
+    - name: enable automerge
+      shell: bash
+      run: gh pr merge -R "$GITHUB_REPOSITORY" --merge --auto "${{ github.event.pull_request.number }}"
+      env:
+        # secrets.GITHUB_TOKEN can't be used because it can't trigger GitHub Actions Workflow
+        # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow
+        # > When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run
+        GITHUB_TOKEN: ${{ inputs.github_token }}
